@@ -5,7 +5,9 @@ export const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   password: z.string().min(6),
-  role: z.enum(["user", "admin"]).optional().default("user"),
+  role: z.enum(["REPORTER", "CHAPTER_LEAD", "TRIBE_LEAD"]),
+  chapterLeadId: z.string().uuid().optional(),
+  teamName: z.string().optional(),
 });
 
 export const updateUserSchema = z.object({

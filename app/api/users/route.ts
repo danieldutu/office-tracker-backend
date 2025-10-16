@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       return apiError(validation.error.issues[0].message, 400);
     }
 
-    const { email, name, password, role } = validation.data;
+    const { email, name, password, role, chapterLeadId, teamName } = validation.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -89,12 +89,16 @@ export async function POST(request: NextRequest) {
         name,
         passwordHash,
         role,
+        chapterLeadId: chapterLeadId || null,
+        teamName: teamName || null,
       },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
+        teamName: true,
+        chapterLeadId: true,
         avatarUrl: true,
         createdAt: true,
       },

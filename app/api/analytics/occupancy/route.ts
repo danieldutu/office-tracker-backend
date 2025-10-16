@@ -18,12 +18,31 @@ export async function GET(request: NextRequest) {
       return apiError("Reporters cannot access analytics", 403);
     }
 
-    // Get accessible user IDs
-    const accessibleUserIds = await getAccessibleUserIds(user);
-
     const searchParams = request.nextUrl.searchParams;
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
+    const userIdParam = searchParams.get("userId");
+    const chapterLeadIdParam = searchParams.get("chapterLeadId");
+
+    // Get accessible user IDs
+    let accessibleUserIds = await getAccessibleUserIds(user);
+
+    // Further filter by specific user or chapter lead if requested
+    if (userIdParam && accessibleUserIds.includes(userIdParam)) {
+      accessibleUserIds = [userIdParam];
+    } else if (chapterLeadIdParam) {
+      // Filter to only users managed by this chapter lead
+      const chapterLeadUsers = await prisma.user.findMany({
+        where: {
+          chapterLeadId: chapterLeadIdParam,
+          id: {
+            in: accessibleUserIds,
+          },
+        },
+        select: { id: true },
+      });
+      accessibleUserIds = chapterLeadUsers.map((u) => u.id);
+    }
 
     // Default to last 30 days
     let startDate = new Date();

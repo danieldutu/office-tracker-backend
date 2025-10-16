@@ -19,15 +19,50 @@ export async function GET(request: NextRequest) {
       return apiError("Reporters cannot access analytics", 403);
     }
 
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+    const userIdParam = searchParams.get("userId");
+    const chapterLeadIdParam = searchParams.get("chapterLeadId");
+
     // Get accessible user IDs based on role
-    const accessibleUserIds = await getAccessibleUserIds(user);
+    let accessibleUserIds = await getAccessibleUserIds(user);
+
+    // Further filter by specific user or chapter lead if requested
+    if (userIdParam && accessibleUserIds.includes(userIdParam)) {
+      accessibleUserIds = [userIdParam];
+    } else if (chapterLeadIdParam) {
+      // Filter to only users managed by this chapter lead
+      const chapterLeadUsers = await prisma.user.findMany({
+        where: {
+          chapterLeadId: chapterLeadIdParam,
+          id: {
+            in: accessibleUserIds,
+          },
+        },
+        select: { id: true },
+      });
+      accessibleUserIds = chapterLeadUsers.map((u) => u.id);
+    }
 
     // Get total users (scoped to accessible users)
     const totalUsers = accessibleUserIds.length;
 
-    // Get last 30 days of attendance (filtered by accessible users)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Default to last 30 days if not specified
+    let startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+
+    let endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    if (startDateParam) {
+      startDate = new Date(startDateParam);
+    }
+    if (endDateParam) {
+      endDate = new Date(endDateParam);
+    }
 
     const recentAttendance = await prisma.attendanceRecord.findMany({
       where: {
@@ -35,18 +70,25 @@ export async function GET(request: NextRequest) {
           in: accessibleUserIds,
         },
         date: {
-          gte: thirtyDaysAgo,
+          gte: startDate,
+          lte: endDate,
         },
       },
     });
 
-    // Calculate stats
-    const officeRecords = recentAttendance.filter((r) => r.status === "office");
-    const remoteRecords = recentAttendance.filter((r) => r.status === "remote");
-    const totalRecords = recentAttendance.length;
+    // Filter to only working days (Monday-Friday)
+    const workingDayRecords = recentAttendance.filter((r) => {
+      const dayOfWeek = r.date.getDay();
+      return dayOfWeek >= 1 && dayOfWeek <= 5; // 1=Monday, 5=Friday
+    });
 
-    // Average office occupancy (as percentage)
-    const uniqueDates = [...new Set(recentAttendance.map((r) => r.date.toISOString()))];
+    // Calculate stats
+    const officeRecords = workingDayRecords.filter((r) => r.status === "office");
+    const remoteRecords = workingDayRecords.filter((r) => r.status === "remote");
+    const totalRecords = workingDayRecords.length;
+
+    // Average office occupancy (as percentage) - only for working days
+    const uniqueDates = [...new Set(workingDayRecords.map((r) => r.date.toISOString()))];
     const averageOccupancy =
       uniqueDates.length > 0
         ? Math.round((officeRecords.length / uniqueDates.length / totalUsers) * 100)
@@ -82,12 +124,26 @@ export async function GET(request: NextRequest) {
       dayOfWeekCounts[dayName]++;
     });
 
-    const mostPopularDay = Object.entries(dayOfWeekCounts).reduce((a, b) =>
-      a[1] > b[1] ? a : b
-    )[0];
+    // Find most popular day, but return "None" if no office records exist
+    let mostPopularDay = "None";
+    if (officeRecords.length > 0) {
+      const maxEntry = Object.entries(dayOfWeekCounts).reduce((a, b) =>
+        a[1] > b[1] ? a : b
+      );
+      // Only set if count is > 0
+      if (maxEntry[1] > 0) {
+        mostPopularDay = maxEntry[0];
+      }
+    }
 
     // Determine scope
     const scope = user.role === UserRole.TRIBE_LEAD ? "organization" : "team";
+
+    // Calculate status distribution percentages (working days only)
+    const officePercentage = totalRecords > 0 ? Math.round((officeRecords.length / totalRecords) * 100) : 0;
+    const remotePercentage = totalRecords > 0 ? Math.round((remoteRecords.length / totalRecords) * 100) : 0;
+    const absentRecords = workingDayRecords.filter((r) => r.status === "absent" || r.status === "vacation");
+    const absentPercentage = totalRecords > 0 ? Math.round((absentRecords.length / totalRecords) * 100) : 0;
 
     return apiResponse({
       totalUsers,
@@ -96,6 +152,11 @@ export async function GET(request: NextRequest) {
       remoteWorkRate,
       scope, // Indicates if this is team or org data
       teamName: user.role === UserRole.CHAPTER_LEAD ? user.teamName : undefined,
+      statusDistribution: {
+        office: officePercentage,
+        remote: remotePercentage,
+        absent: absentPercentage,
+      },
     });
   } catch (error) {
     console.error("Error fetching analytics overview:", error);
