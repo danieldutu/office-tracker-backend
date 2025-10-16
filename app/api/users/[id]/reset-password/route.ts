@@ -14,7 +14,7 @@ function generateDefaultPassword(name: string): string {
 // POST /api/users/[id]/reset-password - Reset user password to default (Chapter Lead/Tribe Lead only)
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromRequest(request);
@@ -28,7 +28,7 @@ export async function POST(
       return apiError("You do not have permission to reset passwords", 403);
     }
 
-    const targetUserId = params.id;
+    const { id: targetUserId } = await params;
 
     // Get target user
     const targetUser = await prisma.user.findUnique({
