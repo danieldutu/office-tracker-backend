@@ -55,10 +55,12 @@ export async function POST(request: NextRequest) {
         createdAt: user.createdAt.toISOString(),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Login error:", error);
+    console.error("Error stack:", error?.stack);
+    console.error("Error message:", error?.message);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: error?.message },
       { status: 500 }
     );
   }

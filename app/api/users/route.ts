@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         email,
         name,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return apiResponse(user, 201);
+    return apiResponse(newUser, 201);
   } catch (error) {
     console.error("Error creating user:", error);
     return apiError("Internal server error", 500);
