@@ -8,6 +8,20 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// CORS headers - simplified to allow all
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+};
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { 
+    status: 200,
+    headers: corsHeaders 
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -16,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         { error: validation.error.issues[0].message },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -29,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!user || !user.passwordHash) {
       return NextResponse.json(
         { error: "Invalid email or password" },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -38,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (!isValidPassword) {
       return NextResponse.json(
         { error: "Invalid email or password" },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -54,14 +68,14 @@ export async function POST(request: NextRequest) {
         avatarUrl: user.avatarUrl,
         createdAt: user.createdAt.toISOString(),
       },
-    });
+    }, { headers: corsHeaders });
   } catch (error: any) {
     console.error("Login error:", error);
     console.error("Error stack:", error?.stack);
     console.error("Error message:", error?.message);
     return NextResponse.json(
       { error: "Internal server error", details: error?.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
