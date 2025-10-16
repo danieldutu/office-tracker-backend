@@ -1,19 +1,19 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
+import { getUserFromRequest } from "@/lib/auth-helpers";
 
 // GET /api/users/me - Get current user
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!user) {
+      return apiError("Authentication required", 401);
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+    const userDetails = await prisma.user.findUnique({
+      where: { id: user.id },
       select: {
         id: true,
         email: true,
@@ -24,11 +24,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!user) {
+    if (!userDetails) {
       return apiError("User not found", 404);
     }
 
-    return apiResponse(user);
+    return apiResponse(userDetails);
   } catch (error) {
     console.error("Error fetching current user:", error);
     return apiError("Internal server error", 500);
