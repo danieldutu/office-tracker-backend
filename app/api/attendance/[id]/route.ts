@@ -7,7 +7,7 @@ import { updateAttendanceSchema } from "@/lib/validations";
 // GET /api/attendance/[id] - Get specific attendance record
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -16,8 +16,10 @@ export async function GET(
       return apiError("Unauthorized", 401);
     }
 
+    const { id } = await params;
+
     const record = await prisma.attendanceRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: {
@@ -44,7 +46,7 @@ export async function GET(
 // PATCH /api/attendance/[id] - Update attendance record
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -53,9 +55,11 @@ export async function PATCH(
       return apiError("Unauthorized", 401);
     }
 
+    const { id } = await params;
+
     // Check if record exists and belongs to user
     const existingRecord = await prisma.attendanceRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingRecord) {
@@ -78,7 +82,7 @@ export async function PATCH(
     }
 
     const record = await prisma.attendanceRecord.update({
-      where: { id: params.id },
+      where: { id },
       data: validation.data,
       include: {
         user: {
@@ -102,7 +106,7 @@ export async function PATCH(
 // DELETE /api/attendance/[id] - Delete attendance record
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -111,9 +115,11 @@ export async function DELETE(
       return apiError("Unauthorized", 401);
     }
 
+    const { id } = await params;
+
     // Check if record exists and belongs to user
     const existingRecord = await prisma.attendanceRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingRecord) {
@@ -129,7 +135,7 @@ export async function DELETE(
     }
 
     await prisma.attendanceRecord.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return apiResponse({ message: "Attendance record deleted successfully" });

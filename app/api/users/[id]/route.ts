@@ -7,7 +7,7 @@ import { updateUserSchema } from "@/lib/validations";
 // GET /api/users/[id] - Get user by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -16,8 +16,10 @@ export async function GET(
       return apiError("Unauthorized", 401);
     }
 
+    const { id } = await params;
+
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         email: true,
@@ -42,7 +44,7 @@ export async function GET(
 // PATCH /api/users/[id] - Update user
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -51,8 +53,10 @@ export async function PATCH(
       return apiError("Unauthorized", 401);
     }
 
+    const { id } = await params;
+
     // Users can only update their own profile unless they're admin
-    if (session.user.id !== params.id && session.user.role !== "admin") {
+    if (session.user.id !== id && session.user.role !== "admin") {
       return apiError("Forbidden", 403);
     }
 
@@ -71,7 +75,7 @@ export async function PATCH(
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...data,
         ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
@@ -99,7 +103,7 @@ export async function PATCH(
 // DELETE /api/users/[id] - Delete user (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -108,8 +112,10 @@ export async function DELETE(
       return apiError("Unauthorized", 403);
     }
 
+    const { id } = await params;
+
     await prisma.user.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return apiResponse({ message: "User deleted successfully" });
