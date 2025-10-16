@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const validation = createUserSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.errors[0].message, 400);
+      return apiError(validation.error.issues[0].message, 400);
     }
 
     const { email, name, password, role } = validation.data;

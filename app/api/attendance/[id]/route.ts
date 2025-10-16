@@ -78,7 +78,7 @@ export async function PATCH(
     const validation = updateAttendanceSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.errors[0].message, 400);
+      return apiError(validation.error.issues[0].message, 400);
     }
 
     const record = await prisma.attendanceRecord.update({

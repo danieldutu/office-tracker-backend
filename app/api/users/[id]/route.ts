@@ -64,7 +64,7 @@ export async function PATCH(
     const validation = updateUserSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.errors[0].message, 400);
+      return apiError(validation.error.issues[0].message, 400);
     }
 
     const data = validation.data;

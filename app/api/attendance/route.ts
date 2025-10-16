@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const validation = getAttendanceQuerySchema.safeParse(query);
 
     if (!validation.success) {
-      return apiError(validation.error.errors[0].message, 400);
+      return apiError(validation.error.issues[0].message, 400);
     }
 
     const { userId, startDate, endDate, status } = validation.data;
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const validation = createAttendanceSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.errors[0].message, 400);
+      return apiError(validation.error.issues[0].message, 400);
     }
 
     const { userId, date, status, notes } = validation.data;
