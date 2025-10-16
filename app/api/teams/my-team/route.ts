@@ -62,13 +62,14 @@ export async function GET(request: NextRequest) {
           email: member.email,
           role: member.role,
           teamName: member.teamName,
-          recentAttendance: member.attendance,
+          avatarUrl: member.avatarUrl,
+          attendance: member.attendance,
         });
         return acc;
       }, {} as any);
 
       return NextResponse.json({
-        teams: Object.values(groupedTeams),
+        teamsByChapterLead: Object.values(groupedTeams),
         totalMembers: allUsers.length,
       });
     }
@@ -92,13 +93,13 @@ export async function GET(request: NextRequest) {
           name: user.name,
           email: user.email,
         },
-        members: directReports.map((member) => ({
+        teamMembers: directReports.map((member) => ({
           id: member.id,
           name: member.name,
           email: member.email,
           role: member.role,
           teamName: member.teamName,
-          recentAttendance: member.attendance,
+          attendance: member.attendance,
         })),
         totalMembers: directReports.length,
       });
@@ -133,34 +134,36 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         chapterLead,
-        members: teamMembers.map((member) => ({
+        teamMembers: teamMembers.map((member) => ({
           id: member.id,
           name: member.name,
           email: member.email,
           role: member.role,
           teamName: member.teamName,
-          recentAttendance: member.attendance,
+          avatarUrl: member.avatarUrl,
+          attendance: member.attendance,
         })),
         totalMembers: teamMembers.length,
-        readOnly: true, // Reporters have read-only access
+        isReadOnly: true, // Reporters have read-only access
       });
     }
 
     // Reporter without a Chapter Lead
     return NextResponse.json({
       chapterLead: null,
-      members: [
+      teamMembers: [
         {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
           teamName: user.teamName,
-          recentAttendance: [],
+          avatarUrl: user.avatarUrl,
+          attendance: [],
         },
       ],
       totalMembers: 1,
-      readOnly: true,
+      isReadOnly: true,
     });
   } catch (error) {
     console.error("Error fetching team:", error);
