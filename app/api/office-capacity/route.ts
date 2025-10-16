@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
       return apiError("Access denied", 403);
     }
 
+    // Get week offset from query params (default to 0 for current week)
+    const { searchParams } = new URL(request.url);
+    const weekOffset = parseInt(searchParams.get("weekOffset") || "0", 10);
+
     // Get the start of the current week (Monday) using date strings to avoid timezone issues
     const today = new Date();
     const year = today.getFullYear();
@@ -27,7 +31,7 @@ export async function GET(request: NextRequest) {
     const dayOfWeek = todayLocal.getDay(); // 0=Sunday, 1=Monday, etc.
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(todayLocal);
-    monday.setDate(todayLocal.getDate() + mondayOffset);
+    monday.setDate(todayLocal.getDate() + mondayOffset + (weekOffset * 7));
 
     // Get capacity settings
     let capacitySettings = await prisma.officeCapacity.findMany({

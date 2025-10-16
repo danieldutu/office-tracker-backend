@@ -39,3 +39,7 @@ next-env.d.ts
 # prisma
 prisma/migrations
 scripts/import-users.ts
+
+# Temporary files
+*.backup
+dev.db
