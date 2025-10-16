@@ -14,7 +14,9 @@ export const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
   avatarUrl: z.string().url().optional().nullable(),
-  role: z.enum(["user", "admin"]).optional(),
+  role: z.enum(["REPORTER", "CHAPTER_LEAD", "TRIBE_LEAD"]).optional(),
+  chapterLeadId: z.string().uuid().optional().nullable(),
+  teamName: z.string().optional(),
 });
 
 // Attendance validation schemas
