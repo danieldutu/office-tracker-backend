@@ -8,7 +8,7 @@ import { UserRole } from "@prisma/client";
 // GET /api/users/:id/reports - Get direct reports for a Chapter Lead
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await getUserFromRequest(request);
@@ -17,7 +17,7 @@ export async function GET(
       return apiError("Authentication required", 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Check if current user can access the target user
     const canAccess = await canAccessUser(currentUser, id);
