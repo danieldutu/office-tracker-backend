@@ -1,16 +1,25 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { canViewAnalytics, getAccessibleUserIds } from "@/lib/permissions";
 
-// GET /api/analytics/weekly-pattern - Get weekly attendance patterns
+// GET /api/analytics/weekly-pattern - Get weekly attendance patterns (filtered by permissions)
 export async function GET(request: NextRequest) {
   try {
-    // Temporarily disabled auth for testing
-    // const session = await auth();
-    // if (!session?.user) {
-    //   return apiError("Unauthorized", 401);
-    // }
+    const user = await getUserFromRequest(request);
+
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
+
+    // Check if user can view analytics
+    if (!canViewAnalytics(user, "team")) {
+      return apiError("Reporters cannot access analytics", 403);
+    }
+
+    // Get accessible user IDs
+    const accessibleUserIds = await getAccessibleUserIds(user);
 
     // Get last 90 days for better pattern analysis
     const ninetyDaysAgo = new Date();
@@ -18,6 +27,9 @@ export async function GET(request: NextRequest) {
 
     const attendance = await prisma.attendanceRecord.findMany({
       where: {
+        userId: {
+          in: accessibleUserIds, // Only show accessible users' data
+        },
         date: {
           gte: ninetyDaysAgo,
         },

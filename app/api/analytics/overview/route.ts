@@ -1,26 +1,39 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { canViewAnalytics, getAccessibleUserIds } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
 
-// GET /api/analytics/overview - Get general stats
+// GET /api/analytics/overview - Get general stats (role-based scope)
 export async function GET(request: NextRequest) {
   try {
-    // Temporarily disabled auth for testing
-    // const session = await auth();
-    // if (!session?.user) {
-    //   return apiError("Unauthorized", 401);
-    // }
+    const user = await getUserFromRequest(request);
 
-    // Get total active users
-    const totalUsers = await prisma.user.count();
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
 
-    // Get last 30 days of attendance
+    // Check if user can view analytics
+    if (!canViewAnalytics(user, "team")) {
+      return apiError("Reporters cannot access analytics", 403);
+    }
+
+    // Get accessible user IDs based on role
+    const accessibleUserIds = await getAccessibleUserIds(user);
+
+    // Get total users (scoped to accessible users)
+    const totalUsers = accessibleUserIds.length;
+
+    // Get last 30 days of attendance (filtered by accessible users)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const recentAttendance = await prisma.attendanceRecord.findMany({
       where: {
+        userId: {
+          in: accessibleUserIds,
+        },
         date: {
           gte: thirtyDaysAgo,
         },
@@ -73,11 +86,16 @@ export async function GET(request: NextRequest) {
       a[1] > b[1] ? a : b
     )[0];
 
+    // Determine scope
+    const scope = user.role === UserRole.TRIBE_LEAD ? "organization" : "team";
+
     return apiResponse({
       totalUsers,
       averageOccupancy,
       mostPopularDay,
       remoteWorkRate,
+      scope, // Indicates if this is team or org data
+      teamName: user.role === UserRole.CHAPTER_LEAD ? user.teamName : undefined,
     });
   } catch (error) {
     console.error("Error fetching analytics overview:", error);
