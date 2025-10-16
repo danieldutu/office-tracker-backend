@@ -10,7 +10,7 @@ const allocateSchema = z.object({
   userId: z.string().uuid("Invalid user ID"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
   status: z.enum(["office", "remote", "off"], {
-    errorMap: () => ({ message: "Status must be office, remote, or off" }),
+    invalid_type_error: "Status must be office, remote, or off",
   }),
   notes: z.string().optional(),
 });
