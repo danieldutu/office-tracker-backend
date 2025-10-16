@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import { updateUserSchema } from "@/lib/validations";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { canAccessUser } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
 
 // GET /api/users/[id] - Get user by ID
 export async function GET(
@@ -10,13 +12,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const currentUser = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!currentUser) {
+      return apiError("Authentication required", 401);
     }
 
     const { id } = await params;
+
+    // Check if current user can access target user
+    const canAccess = await canAccessUser(currentUser, id);
+    if (!canAccess) {
+      return apiError("You do not have permission to access this user", 403);
+    }
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -25,7 +33,10 @@ export async function GET(
         email: true,
         name: true,
         role: true,
+        teamName: true,
+        chapterLeadId: true,
         avatarUrl: true,
+        isFirstLogin: true,
         createdAt: true,
       },
     });
@@ -47,17 +58,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const currentUser = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!currentUser) {
+      return apiError("Authentication required", 401);
     }
 
     const { id } = await params;
 
-    // Users can only update their own profile unless they're admin
-    if (session.user.id !== id && session.user.role !== "admin") {
-      return apiError("Forbidden", 403);
+    // Users can only update their own profile unless they're Tribe Lead
+    if (currentUser.id !== id && currentUser.role !== UserRole.TRIBE_LEAD) {
+      return apiError("You can only update your own profile", 403);
     }
 
     const body = await request.json();
@@ -69,9 +80,9 @@ export async function PATCH(
 
     const data = validation.data;
 
-    // Only admins can change role
-    if (data.role && session.user.role !== "admin") {
-      return apiError("Only admins can change user roles", 403);
+    // Only Tribe Lead can change roles or assign Chapter Leads
+    if ((data.role || data.chapterLeadId) && currentUser.role !== UserRole.TRIBE_LEAD) {
+      return apiError("Only Tribe Lead can change user roles or team assignments", 403);
     }
 
     const user = await prisma.user.update({
@@ -85,7 +96,10 @@ export async function PATCH(
         email: true,
         name: true,
         role: true,
+        teamName: true,
+        chapterLeadId: true,
         avatarUrl: true,
+        isFirstLogin: true,
         createdAt: true,
       },
     });
@@ -100,19 +114,29 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/users/[id] - Delete user (admin only)
+// DELETE /api/users/[id] - Delete user (Tribe Lead only)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const currentUser = await getUserFromRequest(request);
 
-    if (!session?.user || session.user.role !== "admin") {
-      return apiError("Unauthorized", 403);
+    if (!currentUser) {
+      return apiError("Authentication required", 401);
+    }
+
+    // Only Tribe Lead can delete users
+    if (currentUser.role !== UserRole.TRIBE_LEAD) {
+      return apiError("Only Tribe Lead can delete users", 403);
     }
 
     const { id } = await params;
+
+    // Prevent deleting yourself
+    if (currentUser.id === id) {
+      return apiError("Cannot delete your own account", 400);
+    }
 
     await prisma.user.delete({
       where: { id },

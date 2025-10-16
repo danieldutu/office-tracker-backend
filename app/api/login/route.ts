@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
+        teamName: user.teamName,
+        chapterLeadId: user.chapterLeadId,
+        isFirstLogin: user.isFirstLogin,
+        avatarUrl: user.avatarUrl,
         createdAt: user.createdAt.toISOString(),
       },
     });

@@ -1,25 +1,37 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import bcrypt from "bcryptjs";
 import { createUserSchema } from "@/lib/validations";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { getAccessibleUserIds } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
 
-// GET /api/users - Get all users
+// GET /api/users - Get all users (filtered by permissions)
 export async function GET(request: NextRequest) {
   try {
-    // Temporarily disabled auth for testing
-    // const session = await auth();
-    // if (!session?.user) {
-    //   return apiError("Unauthorized", 401);
-    // }
+    const user = await getUserFromRequest(request);
+
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
+
+    // Get user IDs that current user can access
+    const accessibleUserIds = await getAccessibleUserIds(user);
 
     const users = await prisma.user.findMany({
+      where: {
+        id: {
+          in: accessibleUserIds,
+        },
+      },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
+        teamName: true,
+        chapterLeadId: true,
         avatarUrl: true,
         createdAt: true,
       },
@@ -35,13 +47,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/users - Create new user (admin only)
+// POST /api/users - Create new user (Tribe Lead only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const user = await getUserFromRequest(request);
 
-    if (!session?.user || session.user.role !== "admin") {
-      return apiError("Unauthorized", 403);
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
+
+    // Only Tribe Lead can create users
+    if (user.role !== UserRole.TRIBE_LEAD) {
+      return apiError("Only Tribe Lead can create users", 403);
     }
 
     const body = await request.json();

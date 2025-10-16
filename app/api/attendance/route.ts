@@ -1,17 +1,18 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import { createAttendanceSchema, getAttendanceQuerySchema } from "@/lib/validations";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { getAccessibleUserIds } from "@/lib/permissions";
 
-// GET /api/attendance - Get attendance records
+// GET /api/attendance - Get attendance records (filtered by permissions)
 export async function GET(request: NextRequest) {
   try {
-    // Temporarily disabled auth for testing
-    // const session = await auth();
-    // if (!session?.user) {
-    //   return apiError("Unauthorized", 401);
-    // }
+    const user = await getUserFromRequest(request);
+
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
 
     const searchParams = request.nextUrl.searchParams;
     const query = {
@@ -29,10 +30,21 @@ export async function GET(request: NextRequest) {
 
     const { userId, startDate, endDate, status } = validation.data;
 
-    // Build where clause
-    const where: any = {};
+    // Get accessible user IDs based on current user's role
+    const accessibleUserIds = await getAccessibleUserIds(user);
 
+    // Build where clause
+    const where: any = {
+      userId: {
+        in: accessibleUserIds, // Only show attendance for accessible users
+      },
+    };
+
+    // If specific userId requested, ensure it's accessible
     if (userId) {
+      if (!accessibleUserIds.includes(userId)) {
+        return apiError("You do not have permission to access this user's attendance", 403);
+      }
       where.userId = userId;
     }
 
@@ -58,6 +70,8 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             email: true,
+            role: true,
+            teamName: true,
             avatarUrl: true,
           },
         },
@@ -77,11 +91,11 @@ export async function GET(request: NextRequest) {
 // POST /api/attendance - Create or update attendance record
 export async function POST(request: NextRequest) {
   try {
-    // Temporarily disabled auth for testing
-    // const session = await auth();
-    // if (!session?.user) {
-    //   return apiError("Unauthorized", 401);
-    // }
+    const user = await getUserFromRequest(request);
+
+    if (!user) {
+      return apiError("Authentication required", 401);
+    }
 
     const body = await request.json();
     const validation = createAttendanceSchema.safeParse(body);
@@ -92,9 +106,12 @@ export async function POST(request: NextRequest) {
 
     const { userId, date, status, notes } = validation.data;
 
-    // Users can only create attendance for themselves unless they're admin
-    if (userId !== session.user.id && session.user.role !== "admin") {
-      return apiError("Forbidden", 403);
+    // Check if user can allocate attendance for target user
+    const { canAllocateAttendance } = await import("@/lib/permissions");
+    const canAllocate = await canAllocateAttendance(user, userId);
+
+    if (!canAllocate) {
+      return apiError("You do not have permission to allocate attendance for this user", 403);
     }
 
     // Upsert attendance record (create or update if exists)
