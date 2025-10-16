@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-// import { auth } from "@/lib/auth"; // Disabled for testing
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import { updateAttendanceSchema } from "@/lib/validations";
+import { getUserFromRequest } from "@/lib/auth-helpers";
 
 // GET /api/attendance/[id] - Get specific attendance record
 export async function GET(
@@ -10,10 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const user = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!user) {
+      return apiError("Authentication required", 401);
     }
 
     const { id } = await params;
@@ -49,10 +49,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const user = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!user) {
+      return apiError("Authentication required", 401);
     }
 
     const { id } = await params;
@@ -66,10 +66,10 @@ export async function PATCH(
       return apiError("Attendance record not found", 404);
     }
 
-    // Users can only update their own records unless they're admin
+    // Users can only update their own records unless they're Tribe Lead
     if (
-      existingRecord.userId !== session.user.id &&
-      session.user.role !== "admin"
+      existingRecord.userId !== user.id &&
+      user.role !== "TRIBE_LEAD"
     ) {
       return apiError("Forbidden", 403);
     }
@@ -109,10 +109,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const user = await getUserFromRequest(request);
 
-    if (!session?.user) {
-      return apiError("Unauthorized", 401);
+    if (!user) {
+      return apiError("Authentication required", 401);
     }
 
     const { id } = await params;
@@ -126,10 +126,10 @@ export async function DELETE(
       return apiError("Attendance record not found", 404);
     }
 
-    // Users can only delete their own records unless they're admin
+    // Users can only delete their own records unless they're Tribe Lead
     if (
-      existingRecord.userId !== session.user.id &&
-      session.user.role !== "admin"
+      existingRecord.userId !== user.id &&
+      user.role !== "TRIBE_LEAD"
     ) {
       return apiError("Forbidden", 403);
     }
